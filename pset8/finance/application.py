@@ -1,7 +1,7 @@
 import os
 
 from cs50 import SQL
-from flask import Flask, flash, jsonify, redirect, render_template, request, session
+from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
 from flask_session import Session
 from tempfile import mkdtemp
 from werkzeug.exceptions import default_exceptions, HTTPException, InternalServerError
@@ -97,7 +97,7 @@ def buy():
                            WHERE id = :id AND symbol=:symbol", \
                            id=session["user_id"], symbol=stock["symbol"])
             if not user_shares:
-            db.execute("INSERT INTO portfolio (name, shares, price, total, symbol, id) \
+                db.execute("INSERT INTO portfolio (name, shares, price, total, symbol, id) \
                         VALUES(:name, :shares, :price, :total, :symbol, :id)", \
                         name=stock["name"], shares=shares, price=usd(stock["price"]), \
                         total=usd(shares * stock["price"]), \
@@ -115,7 +115,7 @@ def buy():
 @app.route("/check", methods=["GET"])
 def check():
     """Return true if username available, else false, in JSON format"""
-    return jsonify("TODO")
+    return jsonify("TODO: " + url_for("index"))
 
 
 @app.route("/history")
@@ -211,11 +211,12 @@ def register():
         elif request.form.get("password") != request.form.get("passwordagain"):
             return apology("password doesn't match")
 
+                             #hash=pwd_context.encrypt(request.form.get("password")))
         # insert the new user into users, storing the hash of the user's password
         result = db.execute("INSERT INTO users (username, hash) \
                              VALUES(:username, :hash)", \
                              username=request.form.get("username"), \
-                             hash=pwd_context.encrypt(request.form.get("password")))
+                             hash=generate_password_hash(request.form.get("password")))
 
         if not result:
             return apology("Username already exist")
