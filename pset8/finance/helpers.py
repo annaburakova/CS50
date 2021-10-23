@@ -1,8 +1,37 @@
-import csv
 import urllib.request
+import json
+
+import requests
+import urllib.parse
 
 from flask import redirect, render_template, request, session, url_for
 from functools import wraps
+
+class QuoteResponse:
+    def __init__(self, error, result):
+        self.result = []
+        for mapList in result:
+            for element in mapList:
+                if element == "regularMarketPrice":
+                   price = mapList[element]
+                elif element == "displayName":
+                   displayName = mapList[element]
+                elif element == "symbol":
+                    symbol = mapList[element]
+
+            self.result.append(QuoteResult(price, displayName, symbol))
+        self.error = error
+
+
+class Response:
+    def __init__(self, quoteResponse):
+        self.quoteResponse = QuoteResponse(quoteResponse["error"], quoteResponse["result"])
+
+class QuoteResult:
+    def __init__(self, regularMarketPrice, displayName, symbol):
+        self.symbol = symbol
+        self.regularMarketPrice = regularMarketPrice
+        self.displayName = displayName
 
 def apology(top="", bottom=""):
     t = str(bottom)
@@ -44,25 +73,39 @@ def lookup(symbol):
     # query Yahoo for quote
     # http://stackoverflow.com/a/21351911
     try:
-        url = "http://download.finance.yahoo.com/d/quotes.csv?f=snl1&s={}".format(symbol)
+        url = "https://query1.finance.yahoo.com/v7/finance/quote?symbols={}".format(symbol)
         webpage = urllib.request.urlopen(url)
-        datareader = csv.reader(webpage.read().decode("utf-8").splitlines())
-        row = next(datareader)
-    except:
-        return None
+        js = webpage.read().decode("utf-8")
+        j = json.loads(js)
+        quotes = Response(**j)
+
+        if quotes.quoteResponse.error is not None:
+            return None
+        quote = quotes.quoteResponse.result[0]
+    except Exception as e:
+        return {
+            "name": "parseError of j=" + json.dumps(j),
+            "price": 0,
+            "symbol": str(e)
+        }
 
     # ensure stock exists
     try:
-        price = float(row[2])
+        price = float(quote.regularMarketPrice)
     except:
-        return None
+        return {
+            "name": "priceError",
+            "price": 0,
+            "symbol": ""
+        }
 
     # return stock's name (as a str), price (as a float), and (uppercased) symbol (as a str)
     return {
-        "name": row[1],
+        "name": quote.displayName,
         "price": price,
-        "symbol": row[0].upper()
+        "symbol": quote.symbol.upper()
     }
+
 
 def usd(value):
     """Formats value as USD."""
