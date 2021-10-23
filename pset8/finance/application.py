@@ -230,35 +230,24 @@ def register():
     """Register user"""
 
     if request.method == "POST":
-
-        # ensure username was submitted
-        if not request.form.get("username"):
-            return apology("Must provide username")
-
-        # ensure password was submitted
-        elif not request.form.get("password"):
-            return apology("Must provide password")
-
-        # ensure password and verified password is the same
-        elif request.form.get("password") != request.form.get("passwordagain"):
-            return apology("password doesn't match")
-
-                             #hash=pwd_context.encrypt(request.form.get("password")))
-        # insert the new user into users, storing the hash of the user's password
-        result = db.execute("INSERT INTO users (username, hash) \
-                             VALUES(:username, :hash)", \
-                             username=request.form.get("username"), \
-                             hash=generate_password_hash(request.form.get("password")))
-
-        if not result:
-            return apology("Username already exist")
-
-        # remember which user has logged in
-        session["user_id"] = result
-
-        # redirect user to home page
-        return redirect(url_for("index"))
-
+        un = request.form.get("username")
+        pw = request.form.get("password")
+        if not un:
+            return apology("You must provide an username!", 400)
+        elif not pw:
+            return apology("Missing password", 400)
+        elif not request.form.get("confirmation"):
+            return apology("Password does not match", 400)
+        elif pw != request.form.get("confirmation"):
+            return apology("Password does not match", 400)
+        elif db.execute("SELECT * FROM users WHERE username = :username",
+                        username=un):
+            return apology("Username already exists", 400)
+        hash_pw = generate_password_hash(pw)
+        table = db.execute("INSERT INTO users (username, hash) VALUES(:username, :hash)", username=un, hash=hash_pw)
+        session["user_id"] = table
+        flash("Registered!")
+        return redirect("/")
     else:
         return render_template("register.html")
 
