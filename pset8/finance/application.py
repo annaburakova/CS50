@@ -299,6 +299,7 @@ def errorhandler(e):
     if not isinstance(e, HTTPException):
         e = InternalServerError()
     return apology(e.name, e.code)
+    #response.raise_for_status()
 
 
 # Listen for errors
