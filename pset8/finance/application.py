@@ -103,7 +103,7 @@ def buy():
                                         user_id=user_id, symbol = symbol)
             if len(current_share) == 0:
                 db.execute("INSERT INTO portfolio (id, symbol, shares, price, total)\
-                            VALUES(:user_id, :symbol, :shares, :price, :tptal)",
+                            VALUES(:user_id, :symbol, :shares, :price, :total)",
                             user_id = user_id, symbol = symbol, shares = shares, price = price, total = total)
             else:
                 db.execute("UPDATE portfolio SET shares =:shares, price=:price, total=:total \
@@ -293,7 +293,8 @@ def sell():
         sell_shares = float(request.form.get("shares"))
         shares_info = db.execute("SELECT SUM(shares) AS shares_sum FROM transactions\
                                     WHERE user_id = :user_id GROUP BY symbol HAVING symbol = :symbol", user_id=user_id, symbol=sell_symbol.upper())
-        if shares_info[0]["shares_sum"] < sell_shares:
+        if portfolio_shares < sell_shares:
+        #shares_info[0]["shares_sum"]
             return apology("TOO MANY SHARES", 400)
         #return apology(json.dumps(shares_info), 400)
         else:
@@ -311,14 +312,14 @@ def sell():
             current_share = db.execute("SELECT shares \
                                         FROM portfolio WHERE id = :user_id AND symbol = :symbol", \
                                         user_id=user_id, symbol = sell_symbol)
-            if len(current_share) != 0 and portfolio_shares > sell_shares:
+            if portfolio_shares == sell_shares:
+                db.execute("DELETE FROM portfolio \
+                            WHERE id =:id AND symbol =:symbol",
+                            id=user_id, symbol=sell_symbol)
+            elif portfolio_shares > sell_shares:
                 db.execute("UPDATE portfolio SET shares =:shares, price=:price, total=:total \
                             WHERE id =:id AND symbol =:symbol", \
                             id=user_id, symbol = sell_symbol, shares = portfolio_shares - sell_shares, price = price, total = total)
-            else:
-                db.execute("DELETE FROM portfolio (id, symbol, shares, price, total)\
-                            WHERE id =:id AND symbol =:symbol",
-                            user_id = user_id, symbol = sell_symbol, shares = sell_shares, price = price, total = total)
             flash("Sold")
             return redirect("/")
 
