@@ -48,6 +48,8 @@ def index():
     for portfolio_symbol in portfolio_symbols:
         symbol = portfolio_symbol["symbol"]
         shares = portfolio_symbol["shares"]
+        global portfolio_shares
+        portfolio_shares = shares
         stock = lookup(symbol)
         total = shares * stock["price"]
         total_cash += total
@@ -82,18 +84,32 @@ def buy():
         money = cash[0]["cash"]
         shares = float(request.form.get("shares"))
         price = check["price"]
+        symbol=check["symbol"]
         amount = price * shares
+        total = amount
         user_id = session["user_id"]
         if money < amount:
             return apology("Can't afford", 400)
         else:
             db.execute("INSERT INTO transactions (user_id, stock_name, symbol, shares, price, total)\
                        VALUES(:user_id, :stock_name, :symbol, :shares, :price, :total)",
-                       user_id=user_id, stock_name=check["name"], symbol=check["symbol"],
+                       user_id=user_id, stock_name=check["name"], symbol=symbol,
                        shares=shares, price=price, total=amount)
             balance = money - amount
             db.execute("UPDATE users SET cash = :balance WHERE id = :user_id",
                        balance=balance, user_id=user_id)
+            current_share = db.execute("SELECT shares \
+                                        FROM portfolio WHERE id = :user_id AND symbol = :symbol", \
+                                        user_id=user_id, symbol = symbol)
+            if len(current_share) == 0:
+                db.execute("INSERT INTO portfolio (id, symbol, shares, price, total)\
+                            VALUES(:user_id, :symbol, :shares, :price, :tptal)",
+                            user_id = user_id, symbol = symbol, shares = shares, price = price, total = total)
+            else:
+                db.execute("UPDATE portfolio SET shares =:shares, price=:price, total=:total \
+                            WHERE id =:id AND symbol =:symbol", \
+                            id=user_id, symbol = symbol, shares = shares+portfolio_shares, price = price, total = total)
+
             flash("Bought!")
             return redirect("/")
     else:
@@ -284,12 +300,25 @@ def sell():
             check = lookup(sell_symbol)
             price = check["price"]
             money = -sell_shares * price
+            total = sell_shares * price
             cash = db.execute("SELECT cash FROM users WHERE id = :id", id=user_id)
             balance = cash[0]["cash"] - money
             db.execute("INSERT INTO transactions (user_id, stock_name, symbol, shares, price, total)\
                         VALUES(:user_id, :stock_name, :symbol, :shares, :price, :total)",
                        user_id=user_id, stock_name=check["name"], symbol=sell_symbol, shares=-sell_shares, price=price, total=money)
             db.execute("UPDATE users SET cash = :balance WHERE id = :user_id", balance=balance, user_id=user_id)
+
+            current_share = db.execute("SELECT shares \
+                                        FROM portfolio WHERE id = :user_id AND symbol = :symbol", \
+                                        user_id=user_id, symbol = sell_symbol)
+            if len(current_share) != 0 and portfolio_shares > sell_shares:
+                db.execute("UPDATE portfolio SET shares =:shares, price=:price, total=:total \
+                            WHERE id =:id AND symbol =:symbol", \
+                            id=user_id, symbol = sell_symbol, shares = portfolio_shares - sell_shares, price = price, total = total)
+            else:
+                db.execute("DELETE FROM portfolio (id, symbol, shares, price, total)\
+                            WHERE id =:id AND symbol =:symbol",
+                            user_id = user_id, symbol = sell_symbol, shares = sell_shares, price = price, total = total)
             flash("Sold")
             return redirect("/")
 
